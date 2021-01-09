@@ -1,5 +1,5 @@
-mod sensors;
 mod display;
+mod sensors;
 
 use std::env;
 

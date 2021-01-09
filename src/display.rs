@@ -21,7 +21,7 @@ impl Manager {
     }
 
     pub fn turn_on(&mut self, _debug: bool) -> anyhow::Result<()> {
-        self.shutdown_count = 14;
+        self.shutdown_count = 15;
         //if debug {
         println!("Turned on at {:?}", chrono::Local::now());
         //}

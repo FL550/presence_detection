@@ -42,28 +42,20 @@ impl UltrasonicSensor {
         self.trigger_pin.set_high();
         std::thread::sleep(Duration::from_micros(10));
         self.trigger_pin.set_low();
-        let result = self
-            .echo_pin
-            .poll_interrupt(true, Some(Duration::from_secs(1)))?;
-        if result.is_none() {
-            return Err(SensorError::TimeoutError);
-        }
+        self.echo_pin
+            .poll_interrupt(true, Some(Duration::from_secs(1)))?
+            .ok_or(SensorError::TimeoutError)?;
 
         let start = Instant::now();
+        self.echo_pin.set_interrupt(gpio::Trigger::FallingEdge)?;
         self.echo_pin
-            .set_interrupt(gpio::Trigger::FallingEdge)
-            .expect("Error during falling-interupt setting");
-        if self
-            .echo_pin
             .poll_interrupt(true, Some(Duration::from_secs(1)))?
-            .is_some()
-        {
-            let elapsed = start.elapsed();
-            let elapsed = elapsed.as_micros();
-            //Return distance from elapsed time via formula for travel of sound
-            Ok(((elapsed / 100) as f32 * 3.43) as u32 / 2 as u32)
-        } else {
-            Err(SensorError::TimeoutError)
-        }
+            .ok_or(SensorError::TimeoutError)
+            .map(|_| {
+                let elapsed = start.elapsed();
+                let elapsed = elapsed.as_micros();
+                //Return distance from elapsed time via formula for travel of sound
+                ((elapsed / 100) as f32 * 3.43) as u32 / 2 as u32
+            })
     }
 }
