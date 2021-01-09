@@ -2,9 +2,11 @@ use rppal::gpio;
 use std::time::{Duration, Instant};
 
 #[derive(thiserror::Error, Debug)]
-enum SensorError {
+pub enum SensorError {
     #[error("timeout")]
     TimeoutError,
+    #[error("IoError {0}")]
+    IoError(#[from] rppal::gpio::Error),
 }
 
 pub struct UltrasonicSensor {
@@ -22,7 +24,20 @@ impl UltrasonicSensor {
             echo_pin,
         })
     }
-    pub fn get_distance(&mut self) -> anyhow::Result<u32> {
+
+    pub fn get_distance(&mut self) -> Result<u32, SensorError> {
+        let mut distance;
+        loop {
+            distance = self.measure()?;
+            //Measurement valid check
+            if distance < 2000 {
+                break;
+            }
+        }
+        Ok(distance)
+    }
+
+    fn measure(&mut self) -> Result<u32, SensorError> {
         self.echo_pin.set_interrupt(gpio::Trigger::RisingEdge)?;
         self.trigger_pin.set_high();
         std::thread::sleep(Duration::from_micros(10));
@@ -31,8 +46,9 @@ impl UltrasonicSensor {
             .echo_pin
             .poll_interrupt(true, Some(Duration::from_secs(1)))?;
         if result.is_none() {
-            return Err(SensorError::TimeoutError.into());
+            return Err(SensorError::TimeoutError);
         }
+
         let start = Instant::now();
         self.echo_pin
             .set_interrupt(gpio::Trigger::FallingEdge)
@@ -44,9 +60,10 @@ impl UltrasonicSensor {
         {
             let elapsed = start.elapsed();
             let elapsed = elapsed.as_micros();
-            Ok(((elapsed / 100) as f32 * 3.43) as u32 / 2)
+            //Return distance from elapsed time via formula for travel of sound
+            Ok(((elapsed / 100) as f32 * 3.43) as u32 / 2 as u32)
         } else {
-            Err(SensorError::TimeoutError.into())
+            Err(SensorError::TimeoutError)
         }
     }
 }
